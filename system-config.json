@@ -1,0 +1,134 @@
+{
+  "meta": {
+    "project": "某公司 员工培训数据洞察",
+    "purpose": "将「数据洞察」背后的体系依据沉淀为机器可读配置，作为 AI 生成洞察的单一信息源（知识库驱动）。",
+    "maintenance_model": "三层配置：业务方可直接在知识库中修改 warning_rules 与 routing_rules，修改后洞察与派单自动随之调整；stable_base 仅在分析口径/业务流程调整时由分析·技术团队更新。",
+    "note": "所有阈值/区间均为演示示例值，需以贵司实际目标校准。"
+  },
+  "layers": {
+    "stable_base": {
+      "layer": "① 稳定基线",
+      "owner": "分析·技术团队",
+      "change_frequency": "极低（仅口径/流程调整时）",
+      "business_process": {
+        "description": "八级依次解锁：必须完成低级别，才能进入/开始高级别。",
+        "levels": ["入1", "入2", "E", "B", "A", "Exp", "SME", "SMB"],
+        "note": "全员平均取得率随级别自然递减是结构效应，不代表失败；真实健康度应看队列校正（只统计本应解锁该层级的人群的完成度）。"
+      },
+      "indicators": [
+        {
+          "name": "队列校正 100% 达成率",
+          "definition": "分子=当前级别≥L 且 L取得率=100% 的人数；分母=当前级别≥L 的总人数",
+          "example": "A 级 96.1%",
+          "health_bands": {"green": "≥95", "yellow": "85-95", "red": "<85"},
+          "meaning_when_red": "该层级有系统性推进问题"
+        },
+        {
+          "name": "全体平均取得率",
+          "definition": "分子=全员 L级取得率之和；分母=全员人数",
+          "example": "SMB 21.3%",
+          "health_bands": {"note": "仅供观察，不用于健康判定（结构效应）"},
+          "meaning_when_red": "随级别递减属结构效应"
+        },
+        {
+          "name": "未启动人数",
+          "definition": "八级取得率全为 0 的人数（绝对数+占比）",
+          "health_bands": {"green": "0", "red": ">0"},
+          "meaning_when_red": "到岗/转级后未被拉入培训流程，最危险信号"
+        },
+        {
+          "name": "解锁错乱",
+          "definition": "第 i+1 级>0 且 第 i 级=0 的人数",
+          "health_bands": {"green": "0", "red": ">0"},
+          "meaning_when_red": "数据录入异常或流程跳级，须核对修正"
+        },
+        {
+          "name": "单位综合取得率",
+          "definition": "分子=该单位全员 A取+Exp取 之和；分母=该单位人数×2",
+          "example": "店铺 82905 为 0%",
+          "health_bands": {"green": "≥70", "yellow": "50-70", "red": "<50"},
+          "meaning_when_red": "红色单位存在全员培训触达断裂"
+        },
+        {
+          "name": "线下研修完成率",
+          "definition": "分子=对应级别研修状态=已学完的人数；分母=全员人数",
+          "example": "SME 34.2%",
+          "health_bands": {"green": "≥90", "yellow": "75-90", "red": "<75"},
+          "meaning_when_red": "线上学完但线下没跟上，影响岗位胜任"
+        }
+      ],
+      "indicator_action_mapping": [
+        {"if": "个人未启动（八级全 0）", "action": "1对1 查明原因，手动拉入培训链路", "owner_role": "店长", "sla": "48h"},
+        {"if": "解锁错乱（高级有进度、低级为 0）", "action": "核对录入口径，补正低级别进度", "owner_role": "培训管理员", "sla": "当周"},
+        {"if": "店铺综合取得率 < 50%", "action": "排查培训触发，排固定学习时段", "owner_role": "店长 + 区域经理", "sla": "48h/当周"},
+        {"if": "店铺综合取得率 50-70%", "action": "当周排固定学习时段，复盘卡点", "owner_role": "店长", "sla": "当周"},
+        {"if": "地区综合取得率滞后", "action": "跨店对标，调配带教资源", "owner_role": "区域经理", "sla": "当周"},
+        {"if": "SME 队列达成偏低 / 线下研修滞后", "action": "设副店长预备专项，安排线下研修排期", "owner_role": "L&D + 大区总监", "sla": "双周"},
+        {"if": "组织主数据缺失（大区为空）", "action": "补全 Org 归属，重跑报表", "owner_role": "HRIS / 数据治理", "sla": "1 周"}
+      ]
+    },
+    "warning_rules": {
+      "layer": "② 预警规则（判断阈值与条件）",
+      "owner": "业务方（培训/HR 负责人），可在知识库直接修改",
+      "change_frequency": "最高频",
+      "editable": true,
+      "rules": [
+        {
+          "type": "个人未启动",
+          "trigger": "八个级别取得率全为 0",
+          "frequency": "每日",
+          "output": "个人清单（姓名+工号+所属店铺）",
+          "drives_insight_cards": ["洞察2"]
+        },
+        {
+          "type": "解锁错乱",
+          "trigger": "第 i 级=0 但第 i+1 级>0",
+          "frequency": "每日",
+          "output": "异常个人清单（哪两级错乱）",
+          "drives_insight_cards": ["洞察3"]
+        },
+        {
+          "type": "店铺红/黄",
+          "trigger": "综合取得率 < 70%（黄）／ < 50%（红）",
+          "frequency": "每周",
+          "output": "红/黄店铺名单（综合取得率+人数）",
+          "drives_insight_cards": ["洞察7"],
+          "thresholds": {"red": "<50", "yellow": "50-70", "note": "示例值，可配置"}
+        },
+        {
+          "type": "地区滞后",
+          "trigger": "综合取得率 Top 滞后",
+          "frequency": "每周",
+          "output": "滞后地区清单",
+          "drives_insight_cards": ["洞察7"]
+        },
+        {
+          "type": "大区系统性",
+          "trigger": "队列达成率整体红 / 大区间落差 >15pp",
+          "frequency": "双周",
+          "output": "大区健康度对比报告",
+          "drives_insight_cards": [],
+          "thresholds": {"gap_pp": 15, "note": "示例值，可配置"}
+        }
+      ],
+      "escalation": {
+        "个人未启动": "超 1 周未闭环 → 升级区域经理",
+        "店铺红": "连续 2 周 → 升级大区总监"
+      }
+    },
+    "routing_rules": {
+      "layer": "③ 通知路由（预警通知给谁 / 责任与时限）",
+      "owner": "业务方（责任分工/组织架构调整时更新）",
+      "change_frequency": "中（略低于预警规则）",
+      "editable": true,
+      "raci": [
+        {"scenario": "个人未启动", "R": "店长", "action": "1对1 查明原因、手动拉入培训链路、留痕", "sla": "48h", "A": "区域经理", "escalate": "超 1 周"},
+        {"scenario": "解锁错乱", "R": "培训管理员", "action": "核对录入口径、确认是否跳级/补录", "sla": "当周", "A": "L&D", "escalate": "—"},
+        {"scenario": "店铺红", "R": "店长", "action": "排固定学习时段、当周复盘、上报区域经理", "sla": "当周", "A": "区域经理", "escalate": "连续 2 周"},
+        {"scenario": "地区滞后", "R": "区域经理", "action": "跨店对标、调配带教资源、约谈落后店长", "sla": "当周", "A": "大区总监", "escalate": "连续 3 周"},
+        {"scenario": "SME 晋升瓶颈", "R": "L&D", "action": "设副店长预备专项：补线上→推线下→组织考试", "sla": "双周", "A": "HR 负责人", "escalate": "—"},
+        {"scenario": "组织主数据缺失", "R": "HRIS / 数据治理", "action": "补全大区/地区/店铺归属、重跑报表", "sla": "1 周", "A": "IT + HR", "escalate": "—"}
+      ]
+    }
+  }
+}
